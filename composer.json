@@ -1,6 +1,13 @@
 {
     "name": "isakura/blockchain",
     "description": "A simple blockchain for PHP",
+    "require": {
+        "php": ">=7.0.0"
+    },
+    "require-dev": {
+        "php": ">=7.0.0",
+        "phpunit/phpunit": "~5.7"
+    },
     "license": "MIT",
     "authors": [
         {
@@ -13,12 +20,5 @@
             "Joosie\\Blockchain\\": "src/"
         }
     },
-    "minimum-stability": "dev",
-    "require": {
-        "php": ">=7.0.0"
-    },
-    "require-dev": {
-        "php": ">=7.0.0",
-        "phpunit/phpunit": "~5.7"
-    }
+    "minimum-stability": "dev"
 }
