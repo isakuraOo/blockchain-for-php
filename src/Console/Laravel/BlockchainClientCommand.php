@@ -5,27 +5,34 @@
 namespace Joosie\Blockchain\Console\Laravel;
 
 use Illuminate\Console\Command;
-use swoole_server;
-use Joosie\Blockchain\Exceptions\BlockchainServerException;
+use swoole_client;
+use Joosie\Blockchain\Exceptions\BlockchainClientException;
+use Joosie\Blockchain\Transaction;
 
 /**
 * 基于 Laravel 的命令行处理类
 */
-class BlockchainCommand extends Command
+class BlockchainClientCommand extends Command
 {
-    protected $serv = null;
+    protected $client = null;
+
+    /**
+     * 组播设置
+     * @var array
+     */
+    protected $multicastOption = ['group' => '233.233.233.233', 'interface' => 'en0'];
 
     /**
      * 命令格式
      * @var string
      */
-    protected $signature = 'blockchain {action}';
+    protected $signature = 'blockchainClient {action}';
 
     /**
      * 命令简介
      * @var string
      */
-    protected $description = 'Blockchain service for laravel';
+    protected $description = 'Blockchain client for laravel';
 
     /**
      * 命令执行入口
@@ -55,24 +62,16 @@ class BlockchainCommand extends Command
      */
     public function start()
     {
-        $this->serv = new swoole_server('127.0.0.1', 9501);
-        $this->serv->set([
-            'worker_num'    => env('SW_WORKER_NUM', 4),
-            'reactor_num'   => env('SW_REACOTER_NUM', 8),
-            'max_request'   => env('SW_MAX_REQUEST', 0),
-            'max_conn'      => env('SW_MAX_CONN', 100),
-            'backlog'       => env('SW_BACKLOG', 200)
-        ]);
-        $handler = new BlockchainHandler();
-        $this->serv->on('start', [$handler, 'onStart']);
-        $this->serv->on('connect', [$handler, 'onConnect']);
-        $this->serv->on('receive', [$handler, 'onReceive']);
-        $this->serv->on('close', [$handler, 'onClose']);
-
-        $this->log('Service starting...');
-        if (!$this->serv->start()) {
-            throw new BlockchainServerException('Service start faild!');
+        $this->client = new swoole_client(SWOOLE_SOCK_UDP);
+        $this->client->connect('0.0.0.0', 9608);
+        $socket = $this->client->getSocket();
+        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
+        if (!$res) {
+            throw new BlockchainClientException('Set socket options fail!');
         }
+
+        $handler = new BlockchainClientHandler();
+        $this->client->sendto($this->multicastOption['group'], 9608, 'Hello server,I am client');
     }
 
     /**

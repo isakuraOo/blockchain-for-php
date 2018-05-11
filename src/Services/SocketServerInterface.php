@@ -23,13 +23,21 @@ interface SocketServerInterface
     public function onConnect($serv, $fd);
 
     /**
-     * 数据接收
+     * TCP 数据接收
      * @param  Object  $serv   服务实例
      * @param  Integer $fd     连接标识
      * @param  Integer $fromId 来源标识
      * @param  string  $data   数据内容
      */
     public function onReceive($serv, $fd, $fromId, $data);
+
+    /**
+     * UDP 数据接收
+     * @param  Object $serv    服务实例
+     * @param  String $data    数据内容
+     * @param  Integer $address 数据来源
+     */
+    public function onPacket($serv, $data, $address);
 
     /**
      * 连接关闭
