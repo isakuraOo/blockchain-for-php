@@ -32,4 +32,15 @@ interface SocketClientInterface
      * @param  Integer $fd      连接标识
      */
     public function onClose($client);
+
+    /**
+     * 配置设置
+     * @param Array $conf 配置数组
+     */
+    public function set(array $conf);
+
+    /**
+     * 加入组播
+     */
+    public function joinMulticast();
 }

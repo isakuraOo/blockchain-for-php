@@ -4,8 +4,7 @@
  */
 namespace Joosie\Blockchain\Console\Laravel;
 
-use Illuminate\Console\Command;
-use swoole_server;
+use Joosie\Blockchain\Server\SocketServer;
 use Joosie\Blockchain\Exceptions\BlockchainServerException;
 use Joosie\Blockchain\Exceptions\BlockchainClientException;
 use Joosie\Blockchain\Transaction;
@@ -13,7 +12,7 @@ use Joosie\Blockchain\Transaction;
 /**
 * 基于 Laravel 的命令行处理类
 */
-class BlockchainServerCommand extends Command
+class BlockchainServerCommand extends BlockchainCommand
 {
     protected $serv = null;
 
@@ -74,26 +73,17 @@ class BlockchainServerCommand extends Command
      */
     private function startServ()
     {
-        $this->serv = new swoole_server('0.0.0.0', 9608, SWOOLE_BASE, SWOOLE_SOCK_UDP);
-        $this->serv->set([
+        $this->serv = SocketServer::getServer()->set([
             'worker_num'    => env('SW_WORKER_NUM', 4),
             'reactor_num'   => env('SW_REACOTER_NUM', 8),
             'max_request'   => env('SW_MAX_REQUEST', 0),
             'max_conn'      => env('SW_MAX_CONN', 100),
             'backlog'       => env('SW_BACKLOG', 200)
-        ]);
-        $socket = $this->serv->getSocket();
-        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
-        if (!$res) {
-            throw new BlockchainServerException('Set socket options fail!');
-        }
+        ])->joinMulticast();
 
-        $handler = new BlockchainServerHandler();
-        $this->serv->on('start', [$handler, 'onStart']);
-        $this->serv->on('packet', [$handler, 'onPacket']);
-        // $this->serv->on('connect', [$handler, 'onConnect']);
-        // $this->serv->on('receive', [$handler, 'onReceive']);
-        $this->serv->on('close', [$handler, 'onClose']);
+        $this->serv->on('start', [$this->serv, 'onStart']);
+        $this->serv->on('packet', [$this->serv, 'onPacket']);
+        $this->serv->on('close', [$this->serv, 'onClose']);
 
         $this->log('Service starting...');
         if (!$this->serv->start()) {
@@ -116,22 +106,5 @@ class BlockchainServerCommand extends Command
         $handler = new BlockchainClientHandler();
         $this->client->connect('127.0.0.1', 9608);
         $this->client->sendto($this->multicastOption['group'], 9608, 'Hello server,I am client');
-    }
-
-    /**
-     * 日志输出
-     * @param  string $content 输出内容
-     * @param  string $lv      内容级别[INFO|SUCCESS|ERROR]
-     */
-    private function log($content, $lv = 'INFO')
-    {
-        if ($lv === 'INFO')
-            echo sprintf('%s' . PHP_EOL, $content);
-        elseif ($lv === 'ERROR')
-            echo sprintf("\033[31m%s\033[0m" . PHP_EOL, $content);
-        elseif ($lv === 'SUCCESS')
-            echo sprintf("\033[32m%s\033[0m" . PHP_EOL, $content);
-        else
-            echo sprintf('%s' . PHP_EOL, $content);
     }
 }

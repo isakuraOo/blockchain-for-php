@@ -4,25 +4,16 @@
  */
 namespace Joosie\Blockchain\Client\Swoole;
 
+use swoole_client;
 use Joosie\Blockchain\Client\SocketClientAdapter;
-use Joosie\Blockchain\Transaction;
+use Joosie\Blockchain\Exceptions\BlockchainClientException;
+use Joosie\Blockchain\Console\Message\MsgHandler;
 
 /**
 * 区块链通信服务 Swoole 实现
 */
 class BlockchainSwooleClient extends SocketClientAdapter
 {
-    protected $workNum = null;
-
-    protected $reactorNum = null;
-
-    protected $maxRequest = null;
-
-    protected $maxConnect = null;
-
-    protected $backlog = 20;
-
-    protected $data = [];
 
     /**
      * 事务处理实例
@@ -30,14 +21,14 @@ class BlockchainSwooleClient extends SocketClientAdapter
      */
     public $transaction = null;
     
-    public function __construct(array $config = [])
+    /**
+     * 构造方法
+     * @param integer $sockType Socket 类型
+     */
+    public function __construct(int $sockType = SWOOLE_SOCK_UDP)
     {
-        foreach ($config as $key => $value) {
-            if (isset($this->$key)) {
-                $this->$key = $value;
-            }
-        }
-        $this->transaction = new Transaction();
+        $this->client = new swoole_client($sockType);
+        $this->client->connect($this->ip, $this->port);
     }
 
 
@@ -71,21 +62,41 @@ class BlockchainSwooleClient extends SocketClientAdapter
     }
 
     /**
-     * 服务设置
-     * @param string $name   服务名
-     * @param mixed  $handle 服务处理内容
+     * 服务配置设置
+     * @param array $conf 配置数组
      */
-    public function set(string $name, $handle)
+    public function set(array $conf)
     {
-        $this->data[$name] = $handle;
+        if (empty($conf)) {
+            throw new BlockchainClientException('Invalid socket server configure!');
+        }
+        $this->client->set($conf);
+        return $this;
     }
 
-    function __get($name)
+    /**
+     * 加入组播
+     * @return \Joosie\Blockchain\Client\Swoole\BlockchainSwooleServer
+     */
+    public function joinMulticast()
     {
-        if (!isset($this->$name) || is_null($this->$name)) {
-            if (isset($this->data[$name])) {
-                return $this->$name = $this->data[$name];
-            }
+        $socket = $this->client->getSocket();
+        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
+        if (!$res) {
+            throw new BlockchainClientException('Set socket options fail!');
         }
+        return $this;
+    }
+
+    /**
+     * 发送 UDP 数据包
+     * @param  MsgHandler $msg 数据包处理类
+     * @return Boolean
+     */
+    public function sendto(MsgHandler $msg)
+    {
+        $data = $msg->encrypt();
+        var_dump($data);
+        return $this->client->sendto($this->multicastOption['group'], $this->port, $data);
     }
 }

@@ -2,10 +2,11 @@
 /**
  * @author iSakura <i@joosie.cn>
  */
-namespace Joosie\Blockchain\Services\Swoole;
+namespace Joosie\Blockchain\Server\Swoole;
 
-use Joosie\Blockchain\Services\SocketServerAdapter;
-use Joosie\Blockchain\Transaction;
+use Joosie\Blockchain\Server\SocketServerAdapter;
+use Joosie\Blockchain\Exceptions\BlockchainServerException;
+use swoole_server;
 
 /**
 * 区块链通信服务 Swoole 实现
@@ -30,14 +31,33 @@ class BlockchainSwooleServer extends SocketServerAdapter
      */
     public $transaction = null;
     
-    public function __construct(array $config = [])
+    /**
+     * 构造方法
+     * @param array $config [description]
+     */
+    public function __construct()
     {
-        foreach ($config as $key => $value) {
-            if (isset($this->$key)) {
-                $this->$key = $value;
-            }
-        }
-        $this->transaction = new Transaction();
+        $this->serv = new swoole_server($this->ip, $this->port, SWOOLE_BASE, SWOOLE_SOCK_UDP);
+    }
+
+    /**
+     * 服务启动
+     * @return Boolean
+     */
+    public function start()
+    {
+        return $this->serv->start();
+    }
+
+    /**
+     * 回调事件注册
+     * @param  string $event    事件
+     * @param  mixed  $callback 回调处理
+     * @return integer
+     */
+    public function on(string $event, $callback)
+    {
+        return $this->serv->on($event, $callback);
     }
 
     /**
@@ -74,7 +94,8 @@ class BlockchainSwooleServer extends SocketServerAdapter
     public function onPacket($serv, $data, $address)
     {
         // $serv->sendto('233.233.233.233', 9607, "Hello swoole");
-        var_dump($address, strlen($data), $data);
+        var_dump($address, strlen($data));
+        echo sprintf("onPacket content: %s\n", $data);
     }
 
     /**
@@ -88,21 +109,29 @@ class BlockchainSwooleServer extends SocketServerAdapter
     }
 
     /**
-     * 服务设置
-     * @param string $name   服务名
-     * @param mixed  $handle 服务处理内容
+     * 服务配置设置
+     * @param array $conf 配置数组
      */
-    public function set(string $name, $handle)
+    public function set(array $conf)
     {
-        $this->data[$name] = $handle;
+        if (empty($conf)) {
+            throw new BlockchainServerException('Invalid socket server configure!');
+        }
+        $this->serv->set($conf);
+        return $this;
     }
 
-    function __get($name)
+    /**
+     * 加入组播
+     * @return \Joosie\Blockchain\Server\Swoole\BlockchainSwooleServer
+     */
+    public function joinMulticast()
     {
-        if (!isset($this->$name) || is_null($this->$name)) {
-            if (isset($this->data[$name])) {
-                return $this->$name = $this->data[$name];
-            }
+        $socket = $this->serv->getSocket();
+        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
+        if (!$res) {
+            throw new BlockchainServerException('Set socket options fail!');
         }
+        return $this;
     }
 }

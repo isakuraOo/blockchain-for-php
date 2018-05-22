@@ -10,10 +10,28 @@ namespace Joosie\Blockchain\Client;
 class SocketClientAdapter implements SocketClientInterface
 {
     /**
-     * 服务实例
-     * @var null
+     * 客户端服务实例
+     * @var null\SwooleClient
      */
     protected $client = null;
+
+    /**
+     * 组播配置
+     * @var array
+     */
+    protected $multicastOption = ['group' => '233.233.233.233', 'interface' => 'en0'];
+
+    /**
+     * 监听地址
+     * @var string
+     */
+    protected $ip = '0.0.0.0';
+
+    /**
+     * 监听端口
+     * @var integer
+     */
+    protected $port = 9608;
 
     /**
      * 连接进入
@@ -36,4 +54,15 @@ class SocketClientAdapter implements SocketClientInterface
      * @param  Integer $fd      连接标识
      */
     public function onClose($client) {}
+
+    /**
+     * 配置设置
+     * @param Array $conf 配置数组
+     */
+    public function set(array $conf) {}
+
+    /**
+     * 加入组播
+     */
+    public function joinMulticast() {}
 }
