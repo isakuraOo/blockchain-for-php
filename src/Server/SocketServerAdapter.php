@@ -2,7 +2,7 @@
 /**
  * @author iSakura <i@joosie.cn>
  */
-namespace Joosie\Blockchain\Services;
+namespace Joosie\Blockchain\Server;
 
 /**
 * 
@@ -14,6 +14,24 @@ class SocketServerAdapter implements SocketServerInterface
      * @var null
      */
     protected $serv = null;
+
+    /**
+     * 组播配置
+     * @var array
+     */
+    protected $multicastOption = ['group' => '233.233.233.233', 'interface' => 'en0'];
+
+    /**
+     * 监听地址
+     * @var string
+     */
+    protected $ip = '0.0.0.0';
+
+    /**
+     * 监听端口
+     * @var integer
+     */
+    protected $port = 9608;
 
     /**
      * 服务启动
@@ -51,4 +69,15 @@ class SocketServerAdapter implements SocketServerInterface
      * @param  Integer $fd   连接标识
      */
     public function onClose($serv, $fd) {}
+
+    /**
+     * 配置设置
+     * @param Array $conf 配置数组
+     */
+    public function set(array $conf) {}
+
+    /**
+     * 加入组播
+     */
+    public function joinMulticast() {}
 }

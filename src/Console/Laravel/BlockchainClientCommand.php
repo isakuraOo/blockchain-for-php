@@ -4,15 +4,14 @@
  */
 namespace Joosie\Blockchain\Console\Laravel;
 
-use Illuminate\Console\Command;
-use swoole_client;
 use Joosie\Blockchain\Exceptions\BlockchainClientException;
-use Joosie\Blockchain\Transaction;
+use Joosie\Blockchain\Client\SocketClient;
+use Joosie\Blockchain\Console\Message\MsgHandler;
 
 /**
 * 基于 Laravel 的命令行处理类
 */
-class BlockchainClientCommand extends Command
+class BlockchainClientCommand extends BlockchainCommand
 {
     protected $client = null;
 
@@ -62,32 +61,8 @@ class BlockchainClientCommand extends Command
      */
     public function start()
     {
-        $this->client = new swoole_client(SWOOLE_SOCK_UDP);
-        $this->client->connect('0.0.0.0', 9608);
-        $socket = $this->client->getSocket();
-        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
-        if (!$res) {
-            throw new BlockchainClientException('Set socket options fail!');
-        }
-
-        $handler = new BlockchainClientHandler();
-        $this->client->sendto($this->multicastOption['group'], 9608, 'Hello server,I am client');
-    }
-
-    /**
-     * 日志输出
-     * @param  string $content 输出内容
-     * @param  string $lv      内容级别[INFO|SUCCESS|ERROR]
-     */
-    private function log($content, $lv = 'INFO')
-    {
-        if ($lv === 'INFO')
-            echo sprintf('%s' . PHP_EOL, $content);
-        elseif ($lv === 'ERROR')
-            echo sprintf("\033[31m%s\033[0m" . PHP_EOL, $content);
-        elseif ($lv === 'SUCCESS')
-            echo sprintf("\033[32m%s\033[0m" . PHP_EOL, $content);
-        else
-            echo sprintf('%s' . PHP_EOL, $content);
+        $this->client = SocketClient::getClient()->joinMulticast();
+        $msgHandler = new MsgHandler('Hello server,I am client');
+        $this->client->sendto($msgHandler);
     }
 }
