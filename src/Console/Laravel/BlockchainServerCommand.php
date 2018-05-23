@@ -5,9 +5,10 @@
 namespace Joosie\Blockchain\Console\Laravel;
 
 use Joosie\Blockchain\Server\SocketServer;
+use Joosie\Blockchain\Client\SocketClient;
 use Joosie\Blockchain\Exceptions\BlockchainServerException;
 use Joosie\Blockchain\Exceptions\BlockchainClientException;
-use Joosie\Blockchain\Transaction;
+use Joosie\Blockchain\Console\Message\MsgHandler;
 
 /**
 * 基于 Laravel 的命令行处理类
@@ -17,12 +18,6 @@ class BlockchainServerCommand extends BlockchainCommand
     protected $serv = null;
 
     protected $client = null;
-
-    /**
-     * 组播设置
-     * @var array
-     */
-    protected $multicastOption = ['group' => '233.233.233.233', 'interface' => 'en0'];
 
     /**
      * 命令格式
@@ -96,15 +91,8 @@ class BlockchainServerCommand extends BlockchainCommand
      */
     private function startClient()
     {
-        $this->client = new swoole_client(SWOOLE_SOCK_UDP);
-        $socket = $this->client->getSocket();
-        $res = socket_set_option($socket, IPPROTO_IP, MCAST_JOIN_GROUP, $this->multicastOption);
-        if (!$res) {
-            throw new BlockchainClientException('Set socket options fail!');
-        }
-
-        $handler = new BlockchainClientHandler();
-        $this->client->connect('127.0.0.1', 9608);
-        $this->client->sendto($this->multicastOption['group'], 9608, 'Hello server,I am client');
+        $this->client = SocketClient::getClient()->joinMulticast();
+        $msgHandler = new MsgHandler('Hello server,I am client');
+        $this->client->sendto($msgHandler);
     }
 }

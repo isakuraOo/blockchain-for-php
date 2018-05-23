@@ -34,19 +34,22 @@ class MsgHandler
     protected $decryptData = '';
 
     /**
-     * 构造函数
-     * @param string $privateKey 数据加解密密钥|明文数据
-     * @param string $iv         数据加解密向量
+     * 消息类型
+     * @see \Joosie\Blockchain\Console\Message\MsgType
+     * @var null|Integer
      */
-    public function __construct(string $privateKey = null, string $iv = null)
+    protected $msgType = null;
+
+    /**
+     * 构造函数
+     * @param String  $msgData  数据内容(目前仅支持接收数据明文)
+     * @param Integer $msgType  数据类型
+     * @see \Joosie\Blockchain\Console\Message\MsgType
+     */
+    public function __construct(string $msgData = null, string $msgType = MsgType::TYPE_COMMON)
     {
-        if (!is_null($privateKey) && is_null($iv)) {
-            $this->decryptData = $privateKey;
-        }
-        if (!is_null($privateKey) && !is_null($iv)) {
-            $this->privateKey = $privateKey;
-            $this->iv = $iv;
-        }
+        $this->decryptData = $privateKey;
+        $this->msgType = $msgType;
     }
 
     /**

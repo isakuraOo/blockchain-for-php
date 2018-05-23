@@ -91,9 +91,14 @@ class BlockchainSwooleServer extends SocketServerAdapter
         echo sprintf("Receive data: %s", $data);
     }
 
+    /**
+     * UDP 数据接收回调事件
+     * @param  Object $serv    服务实例
+     * @param  String $data    数据内容
+     * @param  Array  $address 数据来源地址信息数据
+     */
     public function onPacket($serv, $data, $address)
     {
-        // $serv->sendto('233.233.233.233', 9607, "Hello swoole");
         var_dump($address, strlen($data));
         echo sprintf("onPacket content: %s\n", $data);
     }
