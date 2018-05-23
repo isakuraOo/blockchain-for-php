@@ -16,12 +16,6 @@ class BlockchainClientCommand extends BlockchainCommand
     protected $client = null;
 
     /**
-     * 组播设置
-     * @var array
-     */
-    protected $multicastOption = ['group' => '233.233.233.233', 'interface' => 'en0'];
-
-    /**
      * 命令格式
      * @var string
      */

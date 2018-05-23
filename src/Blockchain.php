@@ -5,13 +5,12 @@
 namespace Joosie\Blockchain;
 
 use Joosie\Blockchain\Storage\Block;
-use Joosie\Blockchain\Client\SocketClient;
 use Joosie\Blockchain\Exceptions\BlockchainException;
 
 /**
 * 区块链主类
 */
-class Blockchain
+class Blockchain extends BlockchainBase
 {
     /**
      * 当前区块
@@ -20,25 +19,12 @@ class Blockchain
     protected $nowBlock = null;
 
     /**
-     * Socket 服务客户端
-     * @var Joosie\Blockchain\Client\SocketClient
+     * 构造
+     * @param ConfigManager|null $config 配置类
      */
-    protected $sockClient = null;
-
-    /**
-     * 配置参数实例
-     * @var \Joosie\Blockchain\Config
-     */
-    protected $config = null;
-    
-    /**
-     * 构造方法
-     * @param array $config 配置参数
-     */
-    function __construct(array $config = [])
+    public function __construct(ConfigManager $config = null)
     {
-        $this->config = new Config($config);
-        $this->sockClient = new SocketClient();
+        parent::__construct($config);
     }
 
     /**

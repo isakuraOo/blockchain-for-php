@@ -8,9 +8,9 @@ use Joosie\Blockchain\Exceptions\BlockchainConfigException;
 use ArrayAccess;
 
 /**
- * 配置类
+ * 配置管理类
  */
-class BlockchainConfig implements ArrayAccess
+class ConfigManager implements ArrayAccess
 {
     /**
      * 默认支持的配置
@@ -30,6 +30,7 @@ class BlockchainConfig implements ArrayAccess
      */
     function __construct(array $config = [])
     {
+        $this->defaultConf = require_once(__DIR__ . 'Config/blockchain.php');
         $this->conf = $config;
     }
 

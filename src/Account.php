@@ -33,7 +33,7 @@ class Account implements AccountInterface
      * 钱包账户财产资源实例
      * @var null
      */
-    protected $accountResource = null;
+    protected $resource = null;
 
     /**
      * 构造方法
@@ -75,6 +75,7 @@ class Account implements AccountInterface
             'privateKey'    => $this->privateKey,
             'publicKey'     => $this->publicKey,
             'address'       => $address,
+            'resourceInfo'  => $this->resource->getInfo(),
         ];
     }
 
