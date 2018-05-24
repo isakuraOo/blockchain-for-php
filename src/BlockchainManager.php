@@ -10,7 +10,7 @@ use Joosie\Blockchain\Exceptions\BlockchainException;
 /**
 * 区块链主类
 */
-class Blockchain extends BlockchainBase
+class BlockchainManager extends BlockchainBase
 {
     /**
      * 当前区块
@@ -25,6 +25,7 @@ class Blockchain extends BlockchainBase
     public function __construct(ConfigManager $config = null)
     {
         parent::__construct($config);
+        static::setInstance($this);
     }
 
     /**
@@ -75,5 +76,29 @@ class Blockchain extends BlockchainBase
     public function findBlocks($condition = null)
     {
         # code...
+    }
+
+    /**
+     * 获取服务容器
+     * @return Joosie\Blockchain\Container
+     */
+    public function getContainer()
+    {
+        return $this->container;
+    }
+
+    /**
+     * 魔术方法
+     * @param  String $name 属性名
+     */
+    public function __get($name)
+    {
+        if (isset($this->$name)) {
+            return $this->$name;
+        } elseif (isset($this->container->$name)) {
+            return $this->container->$name;
+        } else {
+            throw new BlockchainException("Invalid property of {$name}");
+        }
     }
 }

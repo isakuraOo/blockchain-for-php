@@ -5,11 +5,12 @@
 namespace Joosie\Blockchain;
 
 use Joosie\Blockchain\Exceptions\BlockchainAccoutException;
+use Joosie\Blockchain\Providers\Service;
 
 /**
  * 区块链账号身份处理类
  */
-class Account implements AccountInterface
+class Account extends Service implements AccountInterface
 {
     /**
      * 私钥
@@ -34,21 +35,6 @@ class Account implements AccountInterface
      * @var null
      */
     protected $resource = null;
-
-    /**
-     * 构造方法
-     * @param string|null $privateKey 私钥内容
-     * @param string|null $publicKey  公钥内容
-     */
-    public function __construct(string $privateKey = null, string $publicKey = null)
-    {
-        if (!is_null($privateKey)) {
-            $this->privateKey = $privateKey;
-        }
-        if (!is_null($publicKey)) {
-            $this->publicKey = $publicKey;
-        }
-    }
 
     /**
      * 获取我的钱包地址

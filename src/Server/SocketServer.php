@@ -5,11 +5,12 @@
 namespace Joosie\Blockchain\Server;
 
 use Joosie\Blockchain\Server\Swoole\BlockchainSwooleServer;
+use Joosie\Blockchain\Providers\Service;
 
 /**
  * Socket 服务端
  */
-class SocketServer
+class SocketServer extends Service
 {
     /**
      * Socket 引擎

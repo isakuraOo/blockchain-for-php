@@ -30,7 +30,7 @@ class ConfigManager implements ArrayAccess
      */
     function __construct(array $config = [])
     {
-        $this->defaultConf = require_once(__DIR__ . 'Config/blockchain.php');
+        $this->defaultConf = require_once(dirname(__FILE__) . '/Config/blockchain.php');
         $this->conf = $config;
     }
 

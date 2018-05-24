@@ -10,10 +10,10 @@ namespace Joosie\Blockchain;
 class BlockchainBase
 {
     /**
-     * Socket 服务客户端
-     * @var Joosie\Blockchain\Client\SocketClient
+     * 实例
+     * @var static
      */
-    protected $sockClient = null;
+    protected static $instance;
 
     /**
      * 配置参数实例
@@ -42,11 +42,33 @@ class BlockchainBase
     }
 
     /**
+     * 设置实例
+     * @param BlockchainBase $instance
+     */
+    public static function setInstance(BlockchainBase $instance)
+    {
+        return static::$instance = $instance;
+    }
+
+    /**
+     * 获取实例
+     * @return static
+     */
+    public static function getInstance()
+    {
+        if (is_null(static::$instance)) {
+            static::$instance = new static;
+        }
+
+        return static::$instance;
+    }
+
+    /**
      * 服务容器初始化
      */
     protected function initContainer()
     {
-        $this->container = new Container();
+        $this->container = new Container($this);
         if (isset($this->config['services'])) {
             foreach ($this->config['services'] as $serviceName => $serviceDefinition) {
                 $this->container->set($serviceName, $serviceDefinition);

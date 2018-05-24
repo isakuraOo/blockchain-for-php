@@ -5,11 +5,12 @@
 namespace Joosie\Blockchain\Client;
 
 use Joosie\Blockchain\Client\Swoole\BlockchainSwooleClient;
+use Joosie\Blockchain\Providers\Service;
 
 /**
  * Socket 客户端
  */
-class SocketClient
+class SocketClient extends Service
 {
     /**
      * Socket 客户端引擎实例
