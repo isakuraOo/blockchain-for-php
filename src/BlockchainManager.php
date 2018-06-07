@@ -4,8 +4,9 @@
  */
 namespace Joosie\Blockchain;
 
-use Joosie\Blockchain\Storage\Block;
+use Joosie\Blockchain\Stores\StoreManager;
 use Joosie\Blockchain\Exceptions\BlockchainException;
+use Joosie\Blockchain\Exceptions\BlockchainAccountException;
 
 /**
 * 区块链主类
@@ -29,62 +30,18 @@ class BlockchainManager extends BlockchainBase
     }
 
     /**
-     * 向当前区块追加一条数据
-     * @param  string $data 数据记录
-     * @return boolean
-     */
-    public function pushToNowBlock(string $data)
-    {
-        # code...
-    }
-
-    /**
-     * 向当前区块批量追加数据
-     * @param  array  $dataArr 数据数组
-     * @return boolean
-     */
-    public function batchPushToNowBlock(array $dataArr)
-    {
-        # code...
-    }
-
-    /**
-     * 获取当前区块
-     * @return Joosie\Blockchain\Storage\Block 当前区块
-     */
-    public function getNowBlock()
-    {
-        # code...
-    }
-
-    /**
-     * 根据条件查找一个区块
-     * @param  mixed $condition 查询条件
-     * @return Joosie\Blockchain\Storage\Block 符合条件的区块
-     */
-    public function findOneBlock($condition)
-    {
-        # code...
-    }
-
-    /**
-     * 根据条件查询区块
-     * @param  mixed $condition 查询条件
-     * 当 $condition 为空时默认查询所有区块
+     * 创建一个新的钱包账号
+     * @param  Boolean $force true|false 是否强制生成新的账号
      * @return array
      */
-    public function findBlocks($condition = null)
+    public function createAccount($force = false)
     {
-        # code...
-    }
+        if (!$force && $this->account->hasAccount()) {
+            throw new BlockchainAccountException('Create a new account is faild! Account has exist.');
+        }
 
-    /**
-     * 获取服务容器
-     * @return Joosie\Blockchain\Container
-     */
-    public function getContainer()
-    {
-        return $this->container;
+        // 创建并返回一个新的钱包数据
+        return $this->account->create()->getMyAccountInfo();
     }
 
     /**
@@ -100,5 +57,27 @@ class BlockchainManager extends BlockchainBase
         } else {
             throw new BlockchainException("Invalid property of {$name}");
         }
+    }
+
+    /**
+     * 获取服务容器
+     * @return Joosie\Blockchain\Container
+     */
+    public function getContainer()
+    {
+        return $this->container;
+    }
+
+    /**
+     * 查询账户详情
+     * @param  string $account 账户地址
+     * @return Array
+     */
+    public function findAccountInfo(string $account = null)
+    {
+        if (is_null($account)) {
+            $account = $this->account->getMyAccountAddress();
+        }
+        return $this->store->findResourcesInfoByAccount($account);
     }
 }

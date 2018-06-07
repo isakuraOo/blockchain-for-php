@@ -96,7 +96,6 @@ class BlockchainSwooleClient extends SocketClientAdapter
     public function sendto(MsgHandler $msg)
     {
         $data = $msg->encrypt();
-        var_dump($data);
         return $this->client->sendto($this->multicastOption['group'], $this->port, $data);
     }
 }

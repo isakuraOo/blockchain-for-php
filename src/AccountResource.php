@@ -14,10 +14,15 @@ use Joosie\Blockchain\Providers\Service;
 class AccountResource extends Service implements AccountResourceInterface
 {
     /**
-     * 账户余额
+     * 默认资产精度
+     */
+    const DEFAULT_BALANCE_SCALE = 10;
+
+    /**
+     * 账户资产余额
      * @var float
      */
-    protected $balance = 0.00;
+    protected $balance = 0.0000000000;
 
     /**
      * 账户
@@ -25,9 +30,21 @@ class AccountResource extends Service implements AccountResourceInterface
      */
     protected $account = null;
 
+    /**
+     * 初始化处理
+     * @return void
+     */
+    protected function init()
+    {
+        $config = $this->blockchainManager->config;
+        // 设置资产精度
+        bcscale(isset($config['balanceScale'])
+            ? $config['balanceScale'] : self::DEFAULT_BALANCE_SCALE);
+    }
+
     public function getInfo()
     {
-
+        return $this;
     }
 
     public function add($amount)

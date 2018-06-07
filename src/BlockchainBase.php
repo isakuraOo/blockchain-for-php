@@ -54,17 +54,17 @@ class BlockchainBase
      * 获取实例
      * @return static
      */
-    public static function getInstance()
+    public static function getInstance(ConfigManager $config = null)
     {
         if (is_null(static::$instance)) {
-            static::$instance = new static;
+            static::$instance = new static($config);
         }
-
         return static::$instance;
     }
 
     /**
      * 服务容器初始化
+     * 在此步骤，服务容器会将配置中 services 内的所有服务注入到容器
      */
     protected function initContainer()
     {

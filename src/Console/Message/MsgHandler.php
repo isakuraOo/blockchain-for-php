@@ -4,22 +4,13 @@
  */
 namespace Joosie\Blockchain\Console\Message;
 
+use Joosie\Blockchain\Helper\Data;
+
 /**
  * 消息处理类
  */
 class MsgHandler
 {
-    /**
-     * 数据加解密私钥
-     * @var string
-     */
-    private $privateKey = 'ycJA1E5zdL93jYsSGXH04wdGNZ7eHoCr';
-
-    /**
-     * 数据加解密向量
-     * @var string
-     */
-    private $iv = '7QYgofxP/f85a9bbjus1ZQ==';
 
     /**
      * 密文消息数据
@@ -58,7 +49,7 @@ class MsgHandler
      */
     public function encrypt()
     {
-        return MsgEncrypt::encrypt($this->decryptData, $this->privateKey, $this->iv);
+        return Data::encrypt($this->decryptData);
     }
 
     /**
@@ -67,7 +58,7 @@ class MsgHandler
      */
     public function decrypt()
     {
-        return MsgDecrypt::decrypt($this->encryptData, $this->privateKey, $this->iv);
+        return Data::decrypt($this->encryptData);
     }
 
     /**

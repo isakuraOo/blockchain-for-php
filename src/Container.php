@@ -47,9 +47,12 @@ class Container
      */
     public function set(string $classAlias, $definition = null)
     {
-        if (is_object($definition) && !$definition instanceof Service) {
-            $message = sprintf('The service "%s" must be instance of %s in blockchain.', $classAlias, Service::class);
-            throw new BlockchainException($message);
+        // 如果注册的服务定义是一个实例，需要校验实例是否是 Service 的实现
+        // 如果不是则不允许注册
+        if (!is_callable($definition) && is_object($definition) && !$definition instanceof Service) {
+            throw new BlockchainException(
+                sprintf('The service [%s] must be instance of %s in blockchain.', $classAlias, Service::class)
+            );
         }
 
         $this->definitions[$classAlias] = $definition;
@@ -91,23 +94,22 @@ class Container
         // 服务实例检测
         // 只有实现 \Joosie\Blockchain\Providers\Service 的实例才能被允许
         if (!$service instanceof Service) {
-            $message = sprintf('The service "%s" must be instance of %s in blockchain.', $classAlias, Service::class);
-            throw new BlockchainException($message);
+            throw new BlockchainException(
+                sprintf('The service "%s" must be instance of %s in blockchain.', $classAlias, Service::class)
+            );
         }
         $this->instances[$classAlias] = $service;
         unset($this->aliases[$classAlias]);
         return $service;
     }
 
-    /**
-     * 魔术方法
-     * 兼容直接通过类属性的形式获取服务实例
-     * @see    $this->get()
-     * @param  String $name 服务名
-     * @return Object       服务实例
-     */
     public function __get($name)
     {
         return $this->get($name);
+    }
+    
+    public function __isset($name)
+    {
+        return isset($this->definitions[$name]);
     }
 }
