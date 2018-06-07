@@ -14,12 +14,6 @@ use Joosie\Blockchain\Exceptions\BlockchainAccountException;
 class BlockchainManager extends BlockchainBase
 {
     /**
-     * 当前区块
-     * @var Joosie\Blockchain\Storage\Block
-     */
-    protected $nowBlock = null;
-
-    /**
      * 构造
      * @param ConfigManager|null $config 配置类
      */
@@ -27,6 +21,15 @@ class BlockchainManager extends BlockchainBase
     {
         parent::__construct($config);
         static::setInstance($this);
+    }
+
+    /**
+     * 获取服务容器
+     * @return Joosie\Blockchain\Container
+     */
+    public function getContainer()
+    {
+        return $this->container;
     }
 
     /**
@@ -45,6 +48,19 @@ class BlockchainManager extends BlockchainBase
     }
 
     /**
+     * 查询账户详情
+     * @param  string $account 账户地址
+     * @return Array
+     */
+    public function findAccountInfo(string $account = null)
+    {
+        if (is_null($account)) {
+            $account = $this->account->getMyAccountAddress();
+        }
+        return $this->store->findResourcesInfoByAccount($account);
+    }
+
+    /**
      * 魔术方法
      * @param  String $name 属性名
      */
@@ -57,27 +73,5 @@ class BlockchainManager extends BlockchainBase
         } else {
             throw new BlockchainException("Invalid property of {$name}");
         }
-    }
-
-    /**
-     * 获取服务容器
-     * @return Joosie\Blockchain\Container
-     */
-    public function getContainer()
-    {
-        return $this->container;
-    }
-
-    /**
-     * 查询账户详情
-     * @param  string $account 账户地址
-     * @return Array
-     */
-    public function findAccountInfo(string $account = null)
-    {
-        if (is_null($account)) {
-            $account = $this->account->getMyAccountAddress();
-        }
-        return $this->store->findResourcesInfoByAccount($account);
     }
 }
