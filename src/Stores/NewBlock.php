@@ -136,7 +136,6 @@ class NewBlock extends Block
         // 广播新区块数据
         $this->blockchainManager->sockServer->sendto(json_encode($data));
         Log::t(sprintf("New block data: \n%s", json_encode($data['block'], JSON_PRETTY_PRINT)), Log::LOG_TYPE_SUCCESS);
-        Log::t(sprintf("Broadcast data: \n%s", json_encode($data, JSON_PRETTY_PRINT)), Log::LOG_TYPE_SUCCESS);
 
         // 区块数据写入区块链
         if (!$this->pushToBlockchain()) {
@@ -206,7 +205,6 @@ class NewBlock extends Block
             [$this, 'refreshTransactionData']
         );
 
-        Log::t(memory_get_usage());
         // 初始化区块需要保存的区块体数据
         $this->refreshTransactionData();
     }

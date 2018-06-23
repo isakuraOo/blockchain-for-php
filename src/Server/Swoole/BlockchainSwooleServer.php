@@ -145,6 +145,7 @@ class BlockchainSwooleServer extends SocketServerAdapter
     public function sendto(string $message)
     {
         $data = MsgHandler::encrypt($message);
+        Log::t(sprintf("Broadcast data: %s", $data), Log::LOG_TYPE_SUCCESS);
         return $this->serv->sendto($this->multicastOption['group'], $this->port, $data);
     }
 

@@ -17,7 +17,7 @@ class Consensus extends Service implements ConsensusInterface
     /**
      * 区块难度系数
      */
-    const BLOCK_DIFFICULTY = 4;
+    const BLOCK_DIFFICULTY = 5;
 
     /**
      * 待校验区块实例
@@ -72,6 +72,7 @@ class Consensus extends Service implements ConsensusInterface
      */
     public function getCurrentDifficulty()
     {
-        return self::BLOCK_DIFFICULTY;
+        $difficulty = $this->blockchainManager->config['difficulty'];
+        return !empty($difficulty) ? $difficulty : self::BLOCK_DIFFICULTY;
     }
 }

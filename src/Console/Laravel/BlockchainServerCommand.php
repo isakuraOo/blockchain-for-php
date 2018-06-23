@@ -72,8 +72,9 @@ class BlockchainServerCommand extends BlockchainCommand
     public function start()
     {
         $config = [
-            'privateKeyPath'    => env('PRIVATE_KEY_PATH', null),
-            'publicKeyPath'     => env('PUBLIC_KEY_PATH', null)
+            'privateKeyPath'    => env('PRIVATE_KEY_PATH'),
+            'publicKeyPath'     => env('PUBLIC_KEY_PATH'),
+            'difficulty'        => env('BLOCK_DIFFICULTY')
         ];
         $configManager = new ConfigManager($config);
         

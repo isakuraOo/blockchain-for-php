@@ -5,6 +5,8 @@
 return [
     // 主链版本号，在生成账户地址的时候需要用到版本号进行哈希计算
     'version'           => '00',
+    // 区块生成难度系数
+    'difficulty'        => '',
 
     // 密钥文件路径
     'privateKeyPath'    => dirname(dirname(__FILE__)) . '/cert/blockchain_account.cert',

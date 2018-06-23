@@ -36,7 +36,7 @@ class ConfigManager implements ArrayAccess
 
     public function offsetExists($offset)
     {
-        return isset($this->defaultConf[$offset]);
+        return isset($this->conf[$offset]) || isset($this->defaultConf[$offset]);
     }
 
     public function offsetGet($offset)
