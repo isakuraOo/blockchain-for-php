@@ -14,7 +14,7 @@ use Joosie\Blockchain\Exceptions\BlockchainAccountException;
 class BlockchainManager extends BlockchainBase
 {
     /**
-     * 构造
+     * 创建一个对象实例
      * @param ConfigManager|null $config 配置类
      */
     public function __construct(ConfigManager $config = null)
@@ -58,6 +58,17 @@ class BlockchainManager extends BlockchainBase
             $account = $this->account->getMyAccountAddress();
         }
         return $this->store->findResourcesInfoByAccount($account);
+    }
+
+    /**
+     * 生成资产并奖励给用户
+     * @param  string $account      账户地址
+     * @param  mixed  $resourceData 资产数据
+     * @return boolean
+     */
+    public function generateResourceToAccount($account, $resourceData)
+    {
+        # TODO 生成资产并奖励给用户
     }
 
     /**

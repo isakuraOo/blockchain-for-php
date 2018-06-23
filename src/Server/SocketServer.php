@@ -14,9 +14,9 @@ class SocketServer extends Service
 {
     /**
      * Socket 引擎
-     * @var null|Joosie\Blockchain\Server\SocketServerInterface
+     * @var Joosie\Blockchain\Server\SocketServerInterface
      */
-    static protected $engine = null;
+    protected $engine;
     
     /**
      * 获取服务实例
@@ -24,13 +24,23 @@ class SocketServer extends Service
      * @param mixed  $clientEngineClassName 类名，建议使用 XXX\XXX::class 的形式
      * @return \Joosie\Blockchain\Server\SocketServerInterface
      */
-    public static function getServer(array $config = [], $clientEngineClassName = null)
+    public function getServer(array $config = [], $clientEngineClassName = null)
     {
         if (empty($clientEngineClassName)) {
             $clientEngineClassName = BlockchainSwooleServer::class;
         }
 
-        self::$engine = new $clientEngineClassName();
-        return self::$engine;
+        $this->engine = new $clientEngineClassName($this->blockchainManager);
+        return $this->engine;
+    }
+
+    /**
+     * 发送 UDP 数据包
+     * @param  string $message 数据包处理类
+     * @return boolean
+     */
+    public function sendto(string $message)
+    {
+        return $this->engine->sendto($message);
     }
 }

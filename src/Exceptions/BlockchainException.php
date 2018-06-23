@@ -5,8 +5,8 @@
 namespace Joosie\Blockchain\Exceptions;
 
 /**
-* 区块链主异常类
-*/
+ * 区块链主异常类
+ */
 class BlockchainException extends \Exception
 {
     const CODE = 500;

@@ -14,23 +14,14 @@ use Joosie\Blockchain\Console\Message\MsgHandler;
 */
 class BlockchainSwooleClient extends SocketClientAdapter
 {
-
     /**
-     * 事务处理实例
-     * @var null
+     * 实例初始化方法
      */
-    public $transaction = null;
-    
-    /**
-     * 构造方法
-     * @param integer $sockType Socket 类型
-     */
-    public function __construct(int $sockType = SWOOLE_SOCK_UDP)
+    public function init()
     {
-        $this->client = new swoole_client($sockType);
+        $this->client = new swoole_client(SWOOLE_SOCK_UDP);
         $this->client->connect($this->ip, $this->port);
     }
-
 
     /**
      * 连接进入
@@ -90,12 +81,12 @@ class BlockchainSwooleClient extends SocketClientAdapter
 
     /**
      * 发送 UDP 数据包
-     * @param  MsgHandler $msg 数据包处理类
-     * @return Boolean
+     * @param  string $message 数据包处理类
+     * @return boolean
      */
-    public function sendto(MsgHandler $msg)
+    public function sendto(string $message)
     {
-        $data = $msg->encrypt();
+        $data = MsgHandler::encrypt($message);
         return $this->client->sendto($this->multicastOption['group'], $this->port, $data);
     }
 }

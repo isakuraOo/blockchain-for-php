@@ -6,6 +6,12 @@ namespace Joosie\Blockchain\Server\Swoole;
 
 use Joosie\Blockchain\Server\SocketServerAdapter;
 use Joosie\Blockchain\Exceptions\BlockchainServerException;
+use Joosie\Blockchain\Exceptions\BlockchainBlockException;
+use Joosie\Blockchain\Console\Message\MsgHandler;
+use Joosie\Blockchain\Console\Message\MsgType;
+use Joosie\Blockchain\Event\EventType;
+use Joosie\Blockchain\Stores\Block;
+use Joosie\Blockchain\Helper\Log;
 use swoole_server;
 
 /**
@@ -13,31 +19,20 @@ use swoole_server;
 */
 class BlockchainSwooleServer extends SocketServerAdapter
 {
-    protected $workNum = null;
-
-    protected $reactorNum = null;
-
-    protected $maxRequest = null;
-
-    protected $maxConnect = null;
-
-    protected $backlog = 20;
-
-    protected $data = [];
+    /**
+     * 数据包内容
+     * @var string
+     */
+    protected $data;
 
     /**
-     * 事务处理实例
-     * @var null
+     * 实例初始化方法
      */
-    public $transaction = null;
-    
-    /**
-     * 构造方法
-     * @param array $config [description]
-     */
-    public function __construct()
+    public function init()
     {
-        $this->serv = new swoole_server($this->ip, $this->port, SWOOLE_BASE, SWOOLE_SOCK_UDP);
+        $this->serv = new swoole_server(
+            $this->ip, $this->port, SWOOLE_BASE, SWOOLE_SOCK_UDP
+        );
     }
 
     /**
@@ -66,7 +61,10 @@ class BlockchainSwooleServer extends SocketServerAdapter
      */
     public function onStart($serv)
     {
-        echo "Hello blockchain!\n";
+        Log::t('Successfully start!');
+        Log::t('Wanna to sync blockchain data, but...');
+        Log::t('Start work for new block creating...');
+        $this->blockchainManager->block->readyNewBlock()->startWork();
     }
 
     /**
@@ -99,8 +97,7 @@ class BlockchainSwooleServer extends SocketServerAdapter
      */
     public function onPacket($serv, $data, $address)
     {
-        var_dump($address, strlen($data));
-        echo sprintf("onPacket content: %s\n", $data);
+        $this->handlePacketData($serv, $data, $address);
     }
 
     /**
@@ -138,5 +135,114 @@ class BlockchainSwooleServer extends SocketServerAdapter
             throw new BlockchainServerException('Set socket options fail!');
         }
         return $this;
+    }
+
+    /**
+     * 发送 UDP 数据包
+     * @param  string $message 数据包处理类
+     * @return boolean
+     */
+    public function sendto(string $message)
+    {
+        $data = MsgHandler::encrypt($message);
+        return $this->serv->sendto($this->multicastOption['group'], $this->port, $data);
+    }
+
+    /**
+     * 处理接收的 UDP 数据包
+     * @param  Object $serv         服务实例
+     * @param  String $packetData   数据内容
+     * @param  Array  $address      数据来源地址信息数据
+     * @return void
+     */
+    protected function handlePacketData($serv, $packetData, $address)
+    {
+        $tmpRes = MsgHandler::decrypt($packetData);
+        if (!$tmpRes) {
+            return false;
+        }
+
+        $this->data = $tmpRes['data'];
+        switch ($tmpRes['type']) {
+            // 普通消息处理
+            case MsgType::TYPE_COMMON:
+                echo sprintf("%s\n", $this->data);
+                break;
+            // 新节点接入事件
+            case MsgType::TYPE_NEW_NODE_JOIN:
+                $this->handleNewNodeJoin($packetData, $address);
+                break;
+            // 新区块创建成功事件
+            case MsgType::TYPE_NEW_BLOCK_CREATE:
+                // 触发其它节点新区块创建成功事件，用于停止当前新区块计算工作，进入验证
+                $this->blockchainManager->event->trigger(
+                    EventType::EVENT_OTHER_NODE_CREATE_BLOCK_SUCC
+                );
+                // 校验处理新区块数据
+                $this->handleNewBlockFromOtherNode();
+                // 继续开始工作下一个新区块计算
+                $this->blockchainManager->block->readyNewBlock()->startWork();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * 处理其他节点生成的新区块
+     * 如果区块校验结果是合法的，将通知其他节点自己已经校验通过可以准备上链
+     * 同时开始监控当前已校验完成的节点数量是否过半，只有过半才能正式执行上链操作
+     * @return void
+     */
+    protected function handleNewBlockFromOtherNode()
+    {
+        $data = json_decode($this->data, true);
+        $blockHash = $data['block']['header']['hash'];
+        $publicKey = Data::base58decode($data['publicKey']);
+        $decryptData = Data::publicDecrypt($data['sign'], $publicKey);
+
+        // 校验新区块签名
+        if (
+            $blockHash !== $decryptData['block']['header']['hash']
+            || $data['block']['belongtoAccount'] !== $decryptData['block']['belongtoAccount']
+        ) {
+            return $this->blockchainManager->event->trigger(
+                EventType::EVENT_OTHER_NODE_CRAETE_BLOCK_SIGN_FAIL
+            );
+        }
+
+        // 校验新区块哈希
+        $block = Block::create($data['block']);
+        if (!$this->blockchainManager->consensus->validate($block)) {
+            return $this->blockchainManager->event->trigger(
+                EventType::EVENT_OTHER_NODE_CREATE_BLOCK_HASH_FAIL
+            );
+        }
+
+        // 区块数据插入
+        if (
+            !$this->blockchainManager->store->insertOneBlock(
+                $block->hash, json_encode($block->getBlockData())
+            )
+        ) {
+            throw new BlockchainBlockException(
+                sprintf('Insert block data is fail! Block hash: [%s]', $block->hash)
+            );
+        }
+    }
+
+    /**
+     * 新节点接入链网的处理
+     * @param  String $data    数据内容
+     * @param  Array  $address 数据来源地址信息数据
+     * @return void
+     */
+    protected function handleNewNodeJoin($data, $address)
+    {
+        $name = Data::base58encode(
+            sprintf('%s:%s', $address['address'], $address['port'])
+        );
+        $value = ['lastAliveTimeAt'   => time()];
+        $this->blockchainManager->store->saveAliveNode($name, $value);
     }
 }

@@ -16,7 +16,7 @@ class Account extends Service implements AccountInterface
      * 私钥
      * @var string
      */
-    protected $privateKey = '';
+    public $privateKey = '';
 
     /**
      * 公钥
@@ -41,16 +41,18 @@ class Account extends Service implements AccountInterface
         $config = $this->blockchainManager->config;
 
         // 私钥文件被配置时载入私钥数据
-        if (!empty($config['privateKeyPath'])) {
-            // $fp = fopen($config['privateKeyPath'], 'r');
-            // $key = fread($fp, 8192);
-            // fclose($fp);
-            // $this->setPrivateKey(openssl_get_privatekey($key, ''));
+        if (
+            !empty($config['privateKeyPath'])
+            && file_exists($config['privateKeyPath'])
+        ) {
             $this->setPrivateKey(file_get_contents($config['privateKeyPath']));
         }
 
         // 公钥文件被配置时载入公钥数据
-        if (!empty($config['publicKeyPath'])) {
+        if (
+            !empty($config['publicKeyPath'])
+            && file_exists($config['publicKeyPath'])
+        ) {
             $this->setPublicKey(file_get_contents($config['publicKeyPath']));
         }
     }
@@ -135,7 +137,7 @@ class Account extends Service implements AccountInterface
      */
     public function getMyAccountAddress()
     {
-        if (empty($this->address) && !empty($this->publicKey)) {
+        if (empty($this->address)) {
             return $this->getAddressByPublic();
         }
         return $this->address;
@@ -154,17 +156,17 @@ class Account extends Service implements AccountInterface
             'privateKey'    => $this->privateKey,
             'publicKey'     => $this->publicKey,
             'address'       => $address,
-            // 'resourceInfo'  => $this->resource->getInfo(),
+            'walletInfo'    => null,
         ];
     }
 
     /**
      * 转账
-     * @param  string $toAddress   目标钱包地址
-     * @param  float  $resourceNum 转账资源数量
+     * @param  string $account     目标钱包地址
+     * @param  float  $resourceNum 转账资源数据
      * @return boolean
      */
-    public function transfer($toAddress, $resourceNum)
+    public function transfer($account, $resourceData)
     {
 
     }
@@ -182,7 +184,8 @@ class Account extends Service implements AccountInterface
 
         // 将公钥进行两次哈希加密 ripemd160(sha256(PUBLIC_KEY)) 后
         // 在头部拼接上主链版本号
-        $tmpAddress = sprintf('%s%s', $this->blockchainManager->config['version'],
+        $tmpAddress = sprintf('%s%s',
+            $this->blockchainManager->config['version'],
             hash('ripemd160', hash('sha256', $publicKey))
         );
 
@@ -200,8 +203,9 @@ class Account extends Service implements AccountInterface
      * @param  string $filename 目标文件
      * @return boolean
      */
-    public function savePrivateKeyToFile($filename)
+    public function savePrivateKeyToFile($filename = null)
     {
+        $filename = $filename ?: $this->blockchainManager->config['privateKeyPath'];
         return $this->saveToFile($filename, $this->privateKey);
     }
 
@@ -210,8 +214,9 @@ class Account extends Service implements AccountInterface
      * @param  string $filename 目标文件
      * @return boolean
      */
-    public function savePublicKeyToFile($filename)
+    public function savePublicKeyToFile($filename = null)
     {
+        $filename = $filename ?: $this->blockchainManager->config['publicKeyPath'];
         return $this->saveToFile($filename, $this->publicKey);
     }
 

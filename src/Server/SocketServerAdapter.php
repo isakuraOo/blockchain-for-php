@@ -4,10 +4,12 @@
  */
 namespace Joosie\Blockchain\Server;
 
+use Joosie\Blockchain\Providers\Service;
+
 /**
 * 
 */
-class SocketServerAdapter implements SocketServerInterface
+class SocketServerAdapter extends Service implements SocketServerInterface
 {
     /**
      * 服务实例

@@ -7,13 +7,17 @@ namespace Joosie\Blockchain\Console\Laravel;
 use Joosie\Blockchain\Exceptions\BlockchainClientException;
 use Joosie\Blockchain\Client\SocketClient;
 use Joosie\Blockchain\Console\Message\MsgHandler;
+use Joosie\Blockchain\BlockchainManager;
+use Joosie\Blockchain\Helper\Log;
 
 /**
 * 基于 Laravel 的命令行处理类
 */
 class BlockchainClientCommand extends BlockchainCommand
 {
-    protected $client = null;
+    protected $blockchainManager;
+
+    protected $client;
 
     /**
      * 命令格式
@@ -44,8 +48,8 @@ class BlockchainClientCommand extends BlockchainCommand
                 # code...
                 break;
             default:
-                $this->log('Please use the right command.');
-                $this->log('Ex: php artisan blockchain [start|restart|stop] {system}');
+                Log::t('Please use the right command.');
+                Log::t('Ex: php artisan blockchain [start|restart|stop] {system}');
                 break;
         }
     }
@@ -55,8 +59,11 @@ class BlockchainClientCommand extends BlockchainCommand
      */
     public function start()
     {
-        $this->client = SocketClient::getClient()->joinMulticast();
-        $msgHandler = new MsgHandler('Hello server,I am client');
-        $this->client->sendto($msgHandler);
+        $this->blockchainManager = new BlockchainManager();
+        $this->client = $this->blockchainManager->sockClient
+            ->getClient()
+            ->joinMulticast();
+
+        $this->client->sendto('Hello server,I am client');
     }
 }

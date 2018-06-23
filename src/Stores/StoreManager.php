@@ -5,7 +5,8 @@
 namespace Joosie\Blockchain\Stores;
 
 use Joosie\Blockchain\Providers\Service;
-use Joosie\Blockchain\Exceptions\BlockchainServerException;
+use Joosie\Blockchain\Exceptions\BlockchainServiceException;
+use Joosie\Blockchain\Exceptions\BlockchainStoreException;
 use Joosie\Blockchain\Stores\Redis\RedisStore;
 
 /**
@@ -26,8 +27,16 @@ class StoreManager extends Service implements StoreInterface
     const SPENT_TRANSACTION_OUTPUT      = 'spent_transaction_output';
     // 交易记录
     const TRANSACTION_RECORDS           = 'transaction_records';
+    // 待确定交易记录
+    const NO_CONFIRM_TRANSACTION_RECORDS = 'no_confirm_transaction_records';
     // 地址拥有财产情况
     const WALLET_RESOURCES_INFO         = 'wallet_resources_info';
+    // 当前存活节情况
+    const ALIVE_WORK_NODE_DETAIL        = 'alive_work_node_detail';
+    // 新区块确认数量
+    const CONFIRM_NEW_BLOCK_NUM         = 'confirm_new_block_num';
+    // 新区块拒绝数量
+    const CANCEL_NEW_BLOCK_NUM          = 'cancel_new_block_num';
 
     /**
      * 存储引擎
@@ -44,7 +53,7 @@ class StoreManager extends Service implements StoreInterface
     /**
      * 存储服务连接
      * 配置数据将从配置参数服务类中获取当前注入的参数，在配置中必须设置 storeConfig
-     * store 的相关内容，否则将抛出一个 BlockchainServerException 的异常
+     * store 的相关内容，否则将抛出一个 BlockchainServiceException 的异常
      * 同时存储服务类中必须声明有 create[storeName]Store 的方法，因为我们将通过
      * 该方法实例化一个存储引擎
      * @return self
@@ -54,7 +63,7 @@ class StoreManager extends Service implements StoreInterface
         // 配置参数校验
         $configManager = $this->blockchainManager->config;
         if (!isset($configManager['storeConfig'][$configManager['store']])) {
-            throw new BlockchainServerException(
+            throw new BlockchainServiceException(
                 sprintf('Not found store configure for the [%s]!', $configManager['store'])
             );
         }
@@ -64,7 +73,7 @@ class StoreManager extends Service implements StoreInterface
 
         // 检查是否存在对应存储服务的创建方法
         if (!method_exists($this, $storeMethod)) {
-            throw new BlockchainServerException(
+            throw new BlockchainServiceException(
                 sprintf('Not found method [%s] from [%s]', $storeMethod, self::class)
             );
         }
@@ -140,6 +149,133 @@ class StoreManager extends Service implements StoreInterface
     {
         return $this->engine->from($this->getBucket(self::BLOCK_CHAIN_DETAIL_LIST))
             ->select($hash);
+    }
+
+    /**
+     * 获取区块链长度
+     * @return integer
+     */
+    public function getBlockchainLenght()
+    {
+        return $this->engine->from($this->getBucket(self::BLOCK_CHAIN_DETAIL_LIST))
+            ->count();
+    }
+
+    /**
+     * 插入一个区块
+     * @param  string $hash      区块哈希值
+     * @param  string $blockData 区块数据
+     * @return boolean
+     */
+    public function insertOneBlock(string $hash, string $blockData)
+    {
+        $this->engine->beginTransaction();
+        $this->engine->from($this->getBucket(self::BLOCK_CHAIN_DETAIL_LIST))
+            ->bind($hash, $blockData)
+            ->insert();
+        $this->engine->from($this->getBucket(self::BLOCK_CHAIN_HASH_LIST))
+            ->bind($hash)
+            ->insertToRight();
+
+        $result = $this->engine->execute();
+        return $result !== false;
+    }
+
+    /**
+     * 保存存活节点情况
+     * @param  string $nodeName 节点名称标识
+     * @param  string $value    节点数据
+     * @return boolean
+     */
+    public function saveAliveNode(string $nodeName, string $value)
+    {
+        return $this->engine->from($this->getBucket(self::ALIVE_WORK_NODE_DETAIL))
+            ->bind($name, $value)
+            ->insert();
+    }
+
+    /**
+     * 获取当前在线节点数量
+     * @return integer
+     */
+    public function getAliveNodeCount()
+    {
+        return $this->engine->from($this->getBucket(self::ALIVE_WORK_NODE_DETAIL))
+            ->count();
+    }
+
+    /**
+     * 新区块节点确认数量加一
+     * @return integer|false
+     */
+    public function increaseNewBlockConfirm()
+    {
+        return $this->engine->from($this->getBucket(self::CONFIRM_NEW_BLOCK_NUM))
+            ->increase();
+    }
+
+    /**
+     * 新区块节点拒绝数量加一
+     * @return integer|false
+     */
+    public function increaseNewBlockCancel()
+    {
+        return $this->engine->from($this->getBucket(self::CANCEL_NEW_BLOCK_NUM))
+            ->increase();
+    }
+
+    /**
+     * 获取当前新区块确认的节点数量
+     * @return integer
+     */
+    public function getCurrentConfirmNumForNewBlock()
+    {
+        return $this->engine->from($this->getBucket(self::CONFIRM_NEW_BLOCK_NUM))
+            ->get();
+    }
+
+    /**
+     * 校验新区块节点确认情况，是否可以进行区块插入的操作
+     * 当前采取共识策略：只有当超过 50% 的节点确认区块合
+     * 法后才算是达成共识
+     * @return boolean
+     */
+    public function checkNewBlockConfirm()
+    {
+        $aliveNodeCount = $this->getAliveNodeCount();
+        $confirmNum = $this->getCurrentConfirmNumForNewBlock();
+        return ($confirmNum / $aliveNodeCount) > 0.5;
+    }
+
+    /**
+     * 获取待确认的交易数据
+     * @return array
+     */
+    public function getNoConfirmTransactions()
+    {
+        return $this->engine->from($this->getBucket(self::NO_CONFIRM_TRANSACTION_RECORDS))
+            ->getAllList();
+    }
+
+    /**
+     * 确认交易记录
+     * 新区块生成通过验证后需要将区块中成功存储的交易改为已确认交易
+     * @param  array  $transactions 需要确认的订单列表数组
+     * @return void
+     */
+    public function confirmTransactions(array $transactions)
+    {
+        $transactionCount = count($transactions);
+        // 从待确认队列移除对应数量的交易
+        $this->engine->from(
+            $this->getBucket(self::NO_CONFIRM_TRANSACTION_RECORDS)
+        )->listPush($transactionCount);
+
+        // 交易数据插入已完成的队列
+        $store = $this->engine->from($this->getBucket(self::TRANSACTION_RECORDS));
+        foreach ($transactions as $transaction) {
+            $store->bind($transaction)->insertToRight();
+        }
     }
 
     /**

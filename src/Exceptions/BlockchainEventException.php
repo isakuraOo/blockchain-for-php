@@ -5,9 +5,9 @@
 namespace Joosie\Blockchain\Exceptions;
 
 /**
- * 区块链服务端异常处理类
+ * 区块链事件异常处理类
  */
-class BlockchainServerException extends BlockchainException
+class BlockchainEventException extends BlockchainException
 {
 
 }

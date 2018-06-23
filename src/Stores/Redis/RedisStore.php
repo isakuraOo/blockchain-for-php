@@ -31,6 +31,18 @@ class RedisStore implements StoreContractInterface
     protected $bucket;
 
     /**
+     * 字段名
+     * @var string
+     */
+    protected $field;
+
+    /**
+     * 待处理数据
+     * @var mixed
+     */
+    protected $data;
+
+    /**
      * 查询条件
      * @var mixed
      */
@@ -85,9 +97,30 @@ class RedisStore implements StoreContractInterface
         }
     }
 
+    /**
+     * 数据绑定
+     * @param  mixed  $field 数据字段|数据内容
+     * @param  mixed  $data  数据内容，不提供该参数的时候使用 $field 作为数据内容
+     * @return self
+     */
+    public function bind($field, $data = null)
+    {
+        if (is_null($data)) {
+            $this->data = $field;
+        } else {
+            $this->field = $field;
+            $this->data = $data;
+        }
+        return $this;
+    }
+
+    /**
+     * 插入一条数据
+     * @return integer 0|1
+     */
     public function insert()
     {
-        # TODO 插入数据
+        return $this->redis->hset($this->bucket, $this->field, $this->data);
     }
 
     public function delete()
@@ -102,6 +135,20 @@ class RedisStore implements StoreContractInterface
 
     public function get()
     {
+        return $this->redis->get($this->bucket);
+    }
+
+    /**
+     * 获取队列所有数据
+     * @return array
+     */
+    public function getAllList()
+    {
+        return $this->redis->lrange($this->bucket, 0, -1);
+    }
+
+    public function getAll()
+    {
         return $this->redis->hgetall($this->bucket);
     }
 
@@ -115,6 +162,25 @@ class RedisStore implements StoreContractInterface
     }
 
     /**
+     * 开启事务
+     * @return self
+     */
+    public function beginTransaction()
+    {
+        $this->redis->multi(Redis::MULTI);
+        return $this;
+    }
+
+    /**
+     * 事务提交
+     * @return array|false
+     */
+    public function execute()
+    {
+        return $this->redis->exec();
+    }
+
+    /**
      * 查询最后一条数据（仅限队列）
      * @return string
      */
@@ -122,6 +188,52 @@ class RedisStore implements StoreContractInterface
     {
         $len = $this->redis->llen($this->bucket);
         $result = $this->redis->lrange($this->bucket, $len - 1, -1);
-        return !empty($result) ? $reuslt[0] : false;
+        return !empty($result) ? $result[0] : false;
+    }
+
+    /**
+     * 向队列头部插入数据
+     * @return boolean
+     */
+    public function insertToLeft()
+    {
+        return !!$this->redis->lpush($this->bucket, $this->data);
+    }
+
+    /**
+     * 向队列尾部插入数据
+     * @return boolean
+     */
+    public function insertToRight()
+    {
+        return !!$this->redis->rpush($this->bucket, $this->data);
+    }
+
+    /**
+     * 队列修剪，将队列前 $count 个元素移除
+     * @param  integer $count 需要移除的数量
+     * @return boolean
+     */
+    public function listPush($count = 1)
+    {
+        return $this->redis->ltrim($this->bucket, $count, -1);
+    }
+
+    /**
+     * 递增
+     * @return integer|false
+     */
+    public function increase()
+    {
+        return $this->redis->incr($this->bucket);
+    }
+
+    /**
+     * 递减
+     * @return integer|false
+     */
+    public function decrease()
+    {
+        return $this->redis->decr($this->bucket);
     }
 }

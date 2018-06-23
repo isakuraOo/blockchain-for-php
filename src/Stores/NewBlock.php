@@ -7,30 +7,24 @@ namespace Joosie\Blockchain\Stores;
 use Joosie\Blockchain\Helper\Data;
 use Joosie\Blockchain\Exceptions\BlockchainBlockException;
 use Joosie\Blockchain\Exceptions\BlockchainAccountException;
+use Joosie\Blockchain\Helper\Log;
+use Joosie\Blockchain\Helper\Date;
+use Joosie\Blockchain\Event\EventType;
 
 /**
  * 区块链新区块类
  */
 class NewBlock extends Block
 {
-    const DEFAULT_DIFFICULTY = 3;
+    // 单一区块最大交易数据存储数量
+    const MAX_TRANSACTION_DATA_NUM  = 1000;
 
     /**
-     * 添加一条交易数据
-     * @param String $data 一条交易数据
+     * 用于判断是否有其它节点率先完成新区块的计算工作
+     * 默认 false, 通过 Server 监听服务（状态机）控制
+     * @var boolean
      */
-    public function add(string $data)
-    {
-        if (is_null($this->transactionData)) {
-            $tmpData = json_encode([$data]);
-        } else {
-            $tmpData = json_decode($this->transactionData, true);
-            array_push($tmpData, $data);
-        }
-
-        $this->transactionData = $tmpData;
-        return $this;
-    }
+    protected $otherNodeCompleted = false;
 
     /**
      * 开始进行新区块哈希计算
@@ -40,22 +34,73 @@ class NewBlock extends Block
     {
         $this->beforeStartWork();
 
+        // 监听事件
+        $this->blockchainManager->event->listen(
+            EventType::EVENT_OTHER_NODE_CREATE_BLOCK_SUCC,
+            [$this, 'stopWork']
+        );
+        $this->blockchainManager->event->listen(
+            EventType::EVENT_HAS_NEW_TRANSACTION_DATA,
+            [$this, 'refreshTransactionData']
+        );
+
+        // 计算耗时
         $start = microtime(true);
+
+        $i = 0;
+        Log::t(sprintf('Current attempts: %d', $i));
+        Log::t(sprintf('Time consumed: %s', Date::timeFormat('0.0000')));
+        Log::t(sprintf('Current memory usage: %s', memory_get_usage()));
+
         // 利用一个随机初始值来波动每个节点的计算耗时
         $this->nonce = rand(0, 1000000);
         while (!$this->generateBlockHash()->validate()) {
-            usleep(666);
+            $nowTime = microtime(true);
+            Log::t(sprintf("\033[3ACurrent attempts: %d", ++$i));
+            Log::t(sprintf('Time consumed: %s', Date::timeFormat(bcsub($nowTime, $start, 4))));
+            Log::t(sprintf('Current memory usage: %s', memory_get_usage()));
 
-            # TODO 事件触发停止计算
+            // 其它节点率先完成计算
+            if ($this->otherNodeCompleted) {
+                return;
+            }
+
+            usleep(66);
         }
-        echo sprintf("耗时：%f\n", microtime(true) - $start);
 
         // 如果哈希值生成成功，开始抢占区块管理权
-        if (!empty($this->hash)) {
-            $this->seizeManagementRights();
-        }
+        $this->seizeManagementRights();
         
         $this->afterStartWork();
+    }
+
+    /**
+     * 添加一条交易数据
+     * @param string $data 一条交易数据
+     */
+    public function addOneTransaction($data)
+    {
+        if (count($this->transactionData) >= self::MAX_TRANSACTION_DATA_NUM) {
+            throw new BlockchainBlockException(
+                'Too much transaction num in one block!',
+                BlockchainBlockException::ERR_TOO_MUCH_TRANSACTION_NUM
+            );
+        }
+        
+        $data = !is_string($data) ? json_encode($data) : $data;
+        array_push($this->transactionData, $data);
+        return $this;
+    }
+
+    /**
+     * 刷新区块需要存储的交易数据
+     * @return void
+     */
+    protected function refreshTransactionData()
+    {
+        $store = $this->blockchainManager->store;
+        $this->transactionData = $store->getNoConfirmTransactions();
+        $this->dataHash = $this->generateDataHash();
     }
 
     /**
@@ -85,19 +130,39 @@ class NewBlock extends Block
      */
     public function seizeManagementRights()
     {
-        $privateKey = $this->blockchainManager->account->privateKey;
+        $account = $this->blockchainManager->account;
+        $privateKey = $account->privateKey;
         if (empty($privateKey)) {
             throw new BlockchainAccountException('Invalid private key!');
         }
 
-        // 使用用户私钥对区块头数据加密，openssl 进行二次加密将
-        $blockHeadersEncrypted = Data::privateEncode(
-            json_encode($this->getHeaders()), $privateKey
-        );
-        var_dump($blockHeadersEncrypted);
+        $this->blockNumber = $this->blockNumber ?: $this->getNewBlockNumber();
+        $this->belongtoAccount = $this->belongtoAccount ?: $this->blockchainManager->account->getMyAccountAddress();
+        // 使用用户私钥签名数据   
+        $data['block'] = $this->getBlockData();
+        $data['sign'] = Data::privateEncode(json_encode($data), $privateKey);
+        $data['publicKey'] = Data::base58encode($account->publicKey);
 
+        // 广播新区块数据
+        $this->blockchainManager->sockServer->sendto(json_encode($data));
+        Log::t(sprintf("New block data: \n%s", json_encode($data['block'], JSON_PRETTY_PRINT)), Log::LOG_TYPE_SUCCESS);
+        Log::t(sprintf("Broadcast data: \n%s", json_encode($data, JSON_PRETTY_PRINT)), Log::LOG_TYPE_SUCCESS);
 
-        # TODO 等待并校验承认数据有效性的节点数量是否过半
+        // 区块数据写入区块链
+        if (!$this->pushToBlockchain()) {
+            throw new BlockchainBlockException(
+                sprintf('Insert block data is fail! Block hash: [%s]', $this->hash)
+            );
+        }
+    }
+
+    /**
+     * 停止新区块计算工作
+     * @return void
+     */
+    public function stopWork()
+    {
+        $this->otherNodeCompleted = true;
     }
 
     /**
@@ -107,10 +172,10 @@ class NewBlock extends Block
     protected function generateBlockHash()
     {
         $this->version = $this->version ?: $this->blockchainManager->config['version'];
-        $this->dataHash = $this->dataHash ?: $this->generateDataHash();
         $this->timestamp = time();
+        $this->dataHash = $this->dataHash ?: $this->generateDataHash();
 
-        $data = $this->getHeaders();
+        $data = $this->getHeader();
         unset($data['hash']);
         unset($data['blockNumber']);
 
@@ -129,13 +194,7 @@ class NewBlock extends Block
      */
     protected function validate()
     {
-        for ($i = 0; $i < $this->difficulty; $i++) {
-            if ($this->hash[$i + 2] !== '0') {
-                $this->hash = '';
-                return false;
-            }
-        }
-        return true;
+        return $this->blockchainManager->consensus->validate($this);
     }
 
     /**
@@ -145,6 +204,7 @@ class NewBlock extends Block
     protected function beforeStartWork()
     {
         $this->checkStartWork();
+        $this->otherNodeCompleted = false;
     }
 
     /**
@@ -153,7 +213,11 @@ class NewBlock extends Block
      */
     protected function afterStartWork()
     {
-        # TODO after work end
+        // 成功被区块存储的交易记录需要修改为已确认
+        $this->blockchainManager->store->confirmTransactions($this->transactionData);
+        // 继续进行下一个区块的计算工作
+        Log::t('Start generate next one block...');
+        $this->readyNewBlock()->startWork();
     }
 
     /**
@@ -179,7 +243,10 @@ class NewBlock extends Block
         // 如果传入数据为空时，根据区块体交易数据计算 Merkle Tree 的
         // 叶子节点哈希值列表
         if (empty($data)) {
-            foreach ($this->getTransactionData() as $value) {
+            foreach ($this->transactionData as $value) {
+                if (!is_string($value)) {
+                    throw new BlockchainBlockException('Invalid transaction type!');
+                }
                 $data[] = hash('sha256', $value);
             }
         }
@@ -189,9 +256,10 @@ class NewBlock extends Block
 
         // 未计算到根节点
         if (count($result) > 1) {
-            $result = $this->generateMerkleTreeHash($result);
+            $result = $this->generateDataHash($result);
         }
-        return $result[0];
+        $this->merkleTreeData = $result;
+        return '0x' . $result[0]['value'];
     }
 
     /**
@@ -210,7 +278,7 @@ class NewBlock extends Block
     protected function getParentHashListForMerkleTree($data)
     {
         if (empty($data)) {
-            return [hash('sha256', '')];
+            return [['value' => hash('sha256', '')]];
         }
 
         $result = [];
@@ -232,5 +300,26 @@ class NewBlock extends Block
             }
         }
         return $result;
+    }
+
+    /**
+     * 获取当前新区块编号
+     * @return integer
+     */
+    protected function getNewBlockNumber()
+    {
+        return $this->blockchainManager->store->getBlockchainLenght() + 1;
+    }
+
+    /**
+     * 向区块链尾部添加一个区块
+     * @return boolean
+     */
+    protected function pushToBlockchain()
+    {
+        $block = $this->getBlockData();
+        return $this->blockchainManager->store->insertOneBlock(
+            $this->hash, json_encode($block)
+        );
     }
 }

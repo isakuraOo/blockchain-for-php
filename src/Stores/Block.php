@@ -9,8 +9,13 @@ use Joosie\Blockchain\Providers\Service;
 /**
 * 区块数据类
 */
-class Block extends Service
+class Block extends Service implements BlockInterface
 {
+    /**
+     * 区块所属账户
+     * @var string
+     */
+    protected $belongtoAccount;
     
     /************************************************
      * 
@@ -77,22 +82,23 @@ class Block extends Service
     /**
      * 账单数据
      * 数据默认使用 Json 格式存储
-     * @var string
+     * @var array
      */
-    protected $transactionData;
+    protected $transactionData = [];
 
     /**
-     * 账单数据生成的 Merkle Tree
-     * Merkle Tree 默认使用 Json 格式存储
-     * @var string
+     * 账单数据生成的 Merkle Tree 数据数组
+     * 每个树节点由三个属性构成 value 哈希值 leftChildNode 左子节点
+     * rightChildNode 右子节点
+     * @var array
      */
-    protected $merkleTreeData;
+    protected $merkleTreeData = [];
 
     /**
      * 区块头属性列表
-     * @var Array
+     * @var array
      */
-    protected $headerKeys = [
+    static protected $headerKeys = [
         'blockNumber',
         'nonce',
         'difficulty',
@@ -104,16 +110,62 @@ class Block extends Service
     ];
 
     /**
-     * 获取区块体交易数据
-     * @return Array
+     * 区块体属性列表
+     * @var array
      */
-    public function getTransactionData()
+    static protected $bodyKeys = [
+        'transactionData',
+        'merkleTreeData'
+    ];
+
+    /**
+     * 根据区块数据数组创建一个区块实例
+     * @param  array  $data 区块数据数组
+     * [
+     *     'header' => [...static::$headerKeys],
+     *     'body'   => [...static::$bodyKeys],
+     *     'belongtoAccount' => ''
+     * ]
+     * @return static
+     */
+    public function create(array $data)
     {
-        static $data = null;
-        if (is_null($data)) {
-            $data = json_decode($this->transactionData, true) ?: [];
+        $attributes = [];
+        // 检查区块所有者
+        if (!isset($data['belongtoAccount'])) {
+            throw new BlockchainBlockException('Invalid block owner');
         }
-        return $data;
+
+        // 检查区块头数据
+        foreach (static::$headerKeys as $field) {
+            if (!isset($data['header'][$field])) {
+                throw new BlockchainBlockException(
+                    'Required attributes [%s] from block header', $field
+                );
+            }
+
+            $attributes[$field] = $data['header'][$field];
+        }
+
+        // 检查区块体数据
+        foreach (static::bodyKeys as $field) {
+            if (!isset($data['body'][$field])) {
+                throw new BlockchainBlockException(
+                    'Required attributes [%s] from block body', $field
+                );
+            }
+
+            $attributes[$field] = $data['body'][$field];
+        }
+
+        // 根据区块数据创建一个区块实例
+        $instance = new static;
+        foreach ($attributes as $name => $value) {
+            $instance->{$name} = $value;
+        }
+        $instance->belongtoAccount = $data['belongtoAccount'];
+
+        return $instance;
     }
 
     /**
@@ -133,23 +185,57 @@ class Block extends Service
     public function readyNewBlock()
     {
         $prevHash = $this->blockchainManager->store->getLastBlockHash();
-        return NewBlock::getInstance($this->blockchainManager)
-            ->setPrevHash($prevHash === false ? '' : $prevHash)
-            ->setDifficulty(NewBlock::DEFAULT_DIFFICULTY);
+        $newBlock = new NewBlock($this->blockchainManager);
+        return $newBlock->setPrevHash($prevHash === false ? '' : $prevHash)
+            ->setDifficulty(
+                $this->blockchainManager->consensus->getCurrentDifficulty()
+            );
     }
 
     /**
      * 获取区块头部数据
      * @return array
      */
-    public function getHeaders()
+    public function getHeader()
     {
-        $headers = [];
-        foreach ($this->headerKeys as $header) {
-            $headers[$header] = $this->{$header};
+        $header = [];
+        foreach (static::$headerKeys as $headerKey) {
+            $header[$headerKey] = $this->{$headerKey};
         }
-        ksort($headers);
-        return $headers;
+        ksort($header);
+        return $header;
+    }
+
+    /**
+     * 获取区块体数据
+     * @return array
+     */
+    public function getBody()
+    {
+        $body = [];
+        foreach (static::$bodyKeys as $bodyKey) {
+            $body[$bodyKey] = $this->{$bodyKey};
+        }
+        ksort($body);
+        return $body;
+    }
+
+    /**
+     * 获取区块完整数据
+     * [
+     *     'header' => [区块头数据],
+     *     'body'   => [区块体数据],
+     *     'belongtoAccount' => '区块所有者'
+     * ]
+     * @return array
+     */
+    public function getBlockData()
+    {
+        return [
+            'header'    => $this->getHeader(),
+            'body'      => $this->getBody(),
+            'belongtoAccount' => $this->belongtoAccount,
+        ];
     }
 
     /**
