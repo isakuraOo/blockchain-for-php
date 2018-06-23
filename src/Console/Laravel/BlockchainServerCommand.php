@@ -10,6 +10,7 @@ use Joosie\Blockchain\Exceptions\BlockchainServerException;
 use Joosie\Blockchain\Exceptions\BlockchainClientException;
 use Joosie\Blockchain\Console\Message\MsgHandler;
 use Joosie\Blockchain\BlockchainManager;
+use Joosie\Blockchain\ConfigManager;
 use Joosie\Blockchain\Stores\StoreManager;
 use Joosie\Blockchain\Helper\Log;
 
@@ -70,7 +71,13 @@ class BlockchainServerCommand extends BlockchainCommand
      */
     public function start()
     {
-        $blockchain = new BlockchainManager();
+        $config = [
+            'privateKeyPath'    => env('PRIVATE_KEY_PATH', null),
+            'publicKeyPath'     => env('PUBLIC_KEY_PATH', null)
+        ];
+        $configManager = new ConfigManager($config);
+        
+        $blockchain = new BlockchainManager($configManager);
         $blockchain->container->set('store', function() use ($blockchain) {
             return StoreManager::getInstance($blockchain)->connect();
         });

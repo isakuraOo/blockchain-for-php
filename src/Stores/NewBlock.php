@@ -34,16 +34,6 @@ class NewBlock extends Block
     {
         $this->beforeStartWork();
 
-        // 监听事件
-        $this->blockchainManager->event->listen(
-            EventType::EVENT_OTHER_NODE_CREATE_BLOCK_SUCC,
-            [$this, 'stopWork']
-        );
-        $this->blockchainManager->event->listen(
-            EventType::EVENT_HAS_NEW_TRANSACTION_DATA,
-            [$this, 'refreshTransactionData']
-        );
-
         // 计算耗时
         $start = microtime(true);
 
@@ -205,6 +195,20 @@ class NewBlock extends Block
     {
         $this->checkStartWork();
         $this->otherNodeCompleted = false;
+
+        // 监听事件
+        $this->blockchainManager->event->listen(
+            EventType::EVENT_OTHER_NODE_CREATE_BLOCK_SUCC,
+            [$this, 'stopWork']
+        );
+        $this->blockchainManager->event->listen(
+            EventType::EVENT_HAS_NEW_TRANSACTION_DATA,
+            [$this, 'refreshTransactionData']
+        );
+
+        Log::t(memory_get_usage());
+        // 初始化区块需要保存的区块体数据
+        $this->refreshTransactionData();
     }
 
     /**
@@ -247,7 +251,7 @@ class NewBlock extends Block
                 if (!is_string($value)) {
                     throw new BlockchainBlockException('Invalid transaction type!');
                 }
-                $data[] = hash('sha256', $value);
+                $data[]['value'] = hash('sha256', $value);
             }
         }
 
@@ -256,8 +260,9 @@ class NewBlock extends Block
 
         // 未计算到根节点
         if (count($result) > 1) {
-            $result = $this->generateDataHash($result);
+            return $this->generateDataHash($result);
         }
+
         $this->merkleTreeData = $result;
         return '0x' . $result[0]['value'];
     }
@@ -282,22 +287,19 @@ class NewBlock extends Block
         }
 
         $result = [];
-        for ($i = 0; $i < count($data); $i + 2) {
-            if (!isset($data[$i + 1])) {
-                // 单数节点
-                $result[] = [
-                    'value'             => hash('sha256', $data[$i]['value'] . $data[$i]['value']),
-                    'leftChildNode'     => $data[$i],
-                    'rightChildNode'    => null,
-                ];
-            } else {
-                // 双数节点
-                $result[] = [
-                    'value'             => hash('sha256', $data[$i]['value'] . $data[$i + 1]['value']),
-                    'leftChildNode'     => $data[$i],
-                    'rightChildNode'    => $data[$i + 1],
-                ];
-            }
+        $i = 0;
+        while ($i < count($data)) {
+            $tmpValue = isset($data[$i+1]['value'])
+                ? $data[$i]['value'] . $data[$i+1]['value']
+                : $data[$i]['value'] . $data[$i]['value'];
+
+            $result[] = [
+                'value'             => hash('sha256', $tmpValue),
+                'leftChildNode'     => $data[$i],
+                'rightChildNode'    => isset($data[$i+1]) ? $data[$i+1] : null,
+            ];
+
+            $i += 2;
         }
         return $result;
     }
