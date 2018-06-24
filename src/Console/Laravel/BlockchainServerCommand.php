@@ -72,8 +72,8 @@ class BlockchainServerCommand extends BlockchainCommand
     public function start()
     {
         $config = [
-            'privateKeyPath'    => env('PRIVATE_KEY_PATH'),
-            'publicKeyPath'     => env('PUBLIC_KEY_PATH'),
+            'privateKeyPath'    => base_path() . env('PRIVATE_KEY_PATH'),
+            'publicKeyPath'     => base_path() . env('PUBLIC_KEY_PATH'),
             'difficulty'        => env('BLOCK_DIFFICULTY'),
             'storeConfig' => [
                 // Redis 连接服务配置参数
