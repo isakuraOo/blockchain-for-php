@@ -74,7 +74,15 @@ class BlockchainServerCommand extends BlockchainCommand
         $config = [
             'privateKeyPath'    => env('PRIVATE_KEY_PATH'),
             'publicKeyPath'     => env('PUBLIC_KEY_PATH'),
-            'difficulty'        => env('BLOCK_DIFFICULTY')
+            'difficulty'        => env('BLOCK_DIFFICULTY'),
+            'storeConfig' => [
+                // Redis 连接服务配置参数
+                'redis' => [
+                    'host'  => env('REDIS_HOST'),
+                    'port'  => env('REDIS_PORT'),
+                    'auth'  => env('REDIS_PASSWORD'),
+                ],
+            ],
         ];
         $configManager = new ConfigManager($config);
         
